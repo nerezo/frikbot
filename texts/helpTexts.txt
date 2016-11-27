@@ -1,0 +1,4 @@
+Usage: /frik "maximum 140 character length text" http://urlofimage
+
+e.g.
+/frik "text" <image_url>(optional)

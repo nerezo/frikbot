@@ -1,0 +1,25 @@
+{
+  "name": "frikbot",
+  "description": "",
+  "version": "1.0.0",
+  "repository": {},
+  "keywords": [
+    "telegram",
+    "nodejs",
+    "node.js",
+    "telegram bot",
+    "bot"
+  ],
+  "author": "Okan Özeren",
+  "contributors": [],
+  "license": "MIT",
+  "dependencies": {
+    "node-twitter-api": "^1.8.0",
+    "telegram-node-bot": "^4.0.3",
+    "twitter": "^1.4.0",
+    "underscore": "^1.8.3",
+    "underscore.string": "^3.3.4",
+    "q": "^1.4.1"
+  },
+  "devDependencies": {}
+}
