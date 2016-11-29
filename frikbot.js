@@ -127,7 +127,7 @@ var download = function(url, dest, cb) {
 };
 
 
-const textMatcher = /["']([^']+)["']/; // Use the second matched string to get string without quotes.
+const textMatcher = /"(.*?)"/; // Use the second matched string to get string without quotes.
 const urlMatcher = /(http|ftp|https):\/\/[\w-]+(\.[\w-]+)+([\w.,@?^=%&amp;:\/~+#-]*[\w@?^=%&amp;\/~+#-])?/ // Use the first matched string to get complete url string.
 
 class FrikCropController extends TelegramBaseController {
