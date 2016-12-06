@@ -24,9 +24,7 @@ try {
   return;
 }
 
-const tg = new Telegram.Telegram(keys.telegram.bot_key, {
-    workers: 1
-});
+const tg = new Telegram.Telegram(keys.telegram.bot_key, {});
 
 console.log('Telegram frik bot has started...');
 
@@ -40,101 +38,47 @@ var twitterClient = new Twitter({
 });
 // -- Twitter
 
-var startText = fs.readFileSync('./texts/startTexts.txt', 'utf8');
 var helpText = fs.readFileSync('./texts/helpTexts.txt', 'utf8');
 
 // Help method to give usage information.
-class FrikStartController extends TelegramBaseController {
+class HelpController extends TelegramBaseController {
   /**
    * @param {Scope} $
    */
-  startHandler($) {
+  helpHandler($) {
     var opts = {
       disable_web_page_preview: true
     };
-    $.sendMessage(startText, opts);
+    $.sendMessage(helpText, opts);
   }
 
   get routes() {
     return {
-      'startCommand': 'startHandler'
+      'helpCommand': 'helpHandler'
     }
   }
 }
-tg.router.when(new TextCommand('/start', 'startCommand'), new FrikStartController());
-
-// Help method to give usage information.
-class FrikHelpController extends TelegramBaseController {
-  /**
-   * @param {Scope} $
-   */
-  frikhelpHandler($) {
-    var message = helpText + '\n\n' + startText;
-
-    var opts = {
-      disable_web_page_preview: true
-    };
-    $.sendMessage(message, opts);
-  }
-
-  get routes() {
-    return {
-      'frikhelpCommand': 'frikhelpHandler'
-    }
-  }
-}
-tg.router.when(new TextCommand('/frikhelp', 'frikhelpHandler'), new FrikHelpController());
+tg.router.when(new TextCommand('/help', 'helpCommand'), new HelpController());
+tg.router.when(new TextCommand('/start', 'helpCommand'), new HelpController());
 
 // A short-cut to call help controller.
 const callHelp = function ($) {
-  (new FrikHelpController()).frikhelpHandler($);
+  (new HelpController()).helpHandler($);
 }
 
-// Downloads file and saves into the bowl directory.
-var download = function(url, dest, cb) {
-    var file = fs.createWriteStream(dest);
-    var sendReq = request.get(url);
-
-    // verify response code
-    sendReq.on('response', function(response) {
-        if (response.statusCode !== 200) {
-            return cb('Response status was ' + response.statusCode);
-        }
-    });
-
-    // check for request errors
-    sendReq.on('error', function (err) {
-        fs.unlink(dest);
-
-        if (cb) {
-            return cb(err.message);
-        }
-    });
-
-    sendReq.pipe(file);
-
-    file.on('finish', function() {
-        file.close(cb);  // close() is async, call cb after close completes.
-    });
-
-    file.on('error', function(err) { // Handle errors
-        fs.unlink(dest); // Delete the file async. (But we don't check the result)
-
-        if (cb) {
-            return cb(err.message);
-        }
-    });
-};
-
-
-const textMatcher = /["']([^']+)["']/; // Use the second matched string to get string without quotes.
+const textMatcher = /"(.*?)"/; // Use the second matched string to get string without quotes.
 const urlMatcher = /(http|ftp|https):\/\/[\w-]+(\.[\w-]+)+([\w.,@?^=%&amp;:\/~+#-]*[\w@?^=%&amp;\/~+#-])?/ // Use the first matched string to get complete url string.
 
-class FrikCropController extends TelegramBaseController {
+class FrikTextController extends TelegramBaseController {
   /**
    * @param {Scope} $
    */
   frikHandler($) {
+    if ($.message._chat._id !== -1001040845247) {
+      handleException($, {message: 'You can not use this bot in this group!'});
+      return;
+    }
+
     var commandText = s($.message.text).trim().clean().value();
 
     var text;
@@ -144,13 +88,6 @@ class FrikCropController extends TelegramBaseController {
 
       // Remove the text from the all command string to avoid conflict url value in the next step.
       commandText = commandText.replace(text,'');
-
-      /*
-      if (text && text.length > 140) {
-        $.sendMessage('Message should be 140 characters long!');
-        return;
-      }
-      */
     }
 
     var url;
@@ -180,7 +117,7 @@ class FrikCropController extends TelegramBaseController {
     }
   }
 }
-tg.router.when(new TextCommand('/frik', 'frikCommand'), new FrikCropController());
+tg.router.when(new RegexpCommand(/frik/gi, 'frikCommand'), new FrikTextController());
 
 // Exception handlig method. Logging the error and sends the error message to the chat window too.
 var handleException = function($, error) {
@@ -196,30 +133,34 @@ const FILES_BOWL = __dirname + '/files';
 var frikController = function($, text, url) {
   console.log('/frik called with the parameters text:', text, 'url:', url);
 
-  var error_message = GENERIC_ERROR_MESSAGE;
-
   var deferredMedia = Q.defer();
   if (url) {
     var filename = FILES_BOWL + '/' + (new Date()).getTime() + '.' + url.split('.').pop();
-    download(url, filename, function() {
-      console.log('File downloaded: ', filename);
+    downloadImage(url, filename, function(errorMessage) {
+      if (errorMessage) {
+        console.log('File could not be downloaded: ', filename, ', Error Message: ', errorMessage);
 
-      // Load your image
-      var data = fs.readFileSync(filename);
+        deferredMedia.reject(errorMessage);
+      } else {
+        console.log('File downloaded: ', filename);
 
-      // Make post request on media endpoint. Pass file data as media parameter
-      twitterClient.post('media/upload', {media: data}, function(error, media, response) {
-        if (error) {
-          deferredMedia.reject(error);
-        } else {
-          // If successful, a media object will be returned.
-          console.log('Media file posted...');
+        // Load your image
+        var data = fs.readFileSync(filename);
 
-          fs.unlink(filename);
+        // Make post request on media endpoint. Pass file data as media parameter
+        twitterClient.post('media/upload', {media: data}, function(error, media, response) {
+          if (error) {
+            deferredMedia.reject(error.message ? error.message : GENERIC_ERROR_MESSAGE);
+          } else {
+            // If successful, a media object will be returned.
+            console.log('Media file posted...');
 
-          deferredMedia.resolve(media);
-        }
-      });
+            fs.unlink(filename);
+
+            deferredMedia.resolve(media);
+          }
+        });
+      }
     });
   } else {
     deferredMedia.resolve();
@@ -246,13 +187,49 @@ var frikController = function($, text, url) {
 
         console.log(message);
 
-        $.sendMessage(message);
+        var opts = {
+          disable_web_page_preview: true
+        };
+        $.sendMessage(message, opts);
       }
     });
-  }, function(error) {
-    console.log('Error: ', error);
+  }, function(errorMessage) {
+    console.log('Error: ', errorMessage);
 
-    $.sendMessage(error_message);
+    $.sendMessage(errorMessage);
   })
 
+};
+
+// Downloads file and saves into the bowl directory.
+var downloadImage = function(url, dest, cb) {
+    var file = fs.createWriteStream(dest);
+
+    var sendReq = request.get(url);
+    // verify response code
+    sendReq.on('response', function(response) {
+        if (response.statusCode !== 200) {
+            return cb('Response status was: ' + response.statusCode);
+        }
+    });
+    // check for request errors
+    sendReq.on('error', function (err) {
+        fs.unlink(dest);
+
+        if (cb) {
+            return cb(err.message);
+        }
+    });
+    sendReq.pipe(file);
+
+    file.on('finish', function() {
+        file.close(cb);  // close() is async, call cb after close completes.
+    });
+    file.on('error', function(err) { // Handle errors
+        fs.unlink(dest); // Delete the file async. (But we don't check the result)
+
+        if (cb) {
+            return cb(err.message);
+        }
+    });
 };

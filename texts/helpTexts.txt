@@ -1,4 +1,7 @@
-Usage: /frik "maximum 140 character length text" http://urlofimage
+You can use below commands:
+
+/frik - send a frik message and an image to the twitter account. image is optional.
+/help - show usage information.
 
 e.g.
-/frik "text" <image_url>(optional)
+/frik@frikinanatoliabot "message to be sent" http://imageprovider.com/image.jpg
